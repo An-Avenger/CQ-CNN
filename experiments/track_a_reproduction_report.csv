@@ -1,0 +1,26 @@
+label,arch,params,size_kb,epochs,best_val_acc,last_val_acc,paper_acc,paper_f1,paper_prec,paper_spec,status
+α1  2Q Axial,quantum,27392,111.0,10,98.93,98.93,98.4,93.45,87.77,98.43,OK
+α2  2Q Axial-SS,quantum,27392,111.1,10,99.12,97.54,98.51,93.42,89.55,98.53,OK
+α3  2Q Coronal,quantum,13732,57.7,5,99.82,99.82,99.37,97.27,94.71,99.3,OK
+α4  2Q Coronal-SS,quantum,13732,57.8,5,97.19,97.19,94.71,81.43,69.31,94.05,OK
+α5  2Q Sagittal,quantum,13732,57.7,5,99.58,91.82,99.48,97.75,95.69,99.41,OK
+α6  2Q Sagittal-SS,quantum,13732,57.8,5,98.74,98.74,93.7,80.88,70.68,94.04,OK
+α7  2Q 3-Plane,quantum,13732,57.7,10,99.0,99.0,98.23,92.46,90.34,98.61,OK
+α8  2Q 3-Plane-SS,quantum,13732,57.8,10,96.26,96.26,93.5,75.27,67.21,95.7,OK
+β1  3Q Axial,quantum,13739,57.6,10,98.63,98.63,98.86,95.12,90.69,98.72,OK
+β2  3Q Axial-SS,quantum,27399,111.2,10,95.6,95.6,97.01,87.4,78.83,96.86,OK
+β3  3Q Coronal,quantum,13739,57.7,5,98.75,98.75,98.96,95.75,91.86,98.95,OK
+β4  3Q Coronal-SS,quantum,13739,57.8,5,99.62,99.62,93.62,81.23,71.96,92.83,OK
+β5  3Q Sagittal,quantum,13739,57.8,5,98.74,98.74,98.11,90.94,94.92,99.29,OK
+β6  3Q Sagittal-SS,quantum,13739,57.8,5,93.7,93.07,96.22,86.76,78.14,95.75,OK
+β7  3Q 3-Plane,quantum,27399,111.1,10,99.29,98.46,98.79,94.85,90.23,98.64,OK
+β8  3Q 3-Plane-SS ★,quantum,27399,111.2,10,96.96,96.96,97.5,89.45,83.19,97.55,OK
+γ1  Classical Axial,classical,13726,56.7,10,97.11,93.61,,,,,OK
+γ2  Classical Axial-SS,classical,13726,56.7,10,95.42,95.25,,,,,OK
+γ3  Classical Coronal,classical,13726,56.7,5,98.39,98.39,,,,,OK
+γ4  Classical Coronal-SS,classical,13726,56.8,5,96.06,92.87,,,,,OK
+γ5  Classical Sagittal,classical,13726,56.7,5,98.95,98.53,,,,,OK
+γ6  Classical Sagittal-SS,classical,13726,56.8,5,92.86,92.86,,,,,OK
+γ7  Classical 3-Plane,classical,13726,56.7,10,98.94,98.11,,,,,OK
+γ8  Classical 3-Plane-SS,classical,13726,56.8,10,90.17,90.17,,,,,OK
+SOTA TinyAlexNet 3-Plane-SS,alexnet,14502,62.6,10,89.16,89.16,,,,,OK
