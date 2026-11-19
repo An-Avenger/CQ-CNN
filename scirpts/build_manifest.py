@@ -95,19 +95,41 @@ def build_manifest(views_dirs, output_manifest_path, seed=42):
             df.loc[test_idx, 'track_a_split'] = 'test'
 
     # Track B Partitioning (Subject-level: zero subject overlap across splits)
-    real_subjects = sorted(list(set(s for s in df['subject_id'].unique() if s not in ['SYNTHETIC', 'UNKNOWN'])))
+    # Note: Exactly 3 real subjects in OASIS-2 have CDR == 2.0 (moderate dementia).
+    # Stratify by subject clinical condition so each split (train, val, test) contains 1 moderate dementia subject.
+    mod_subjects = sorted(list(set(df[df['label'] == 'moderate_dementia']['subject_id'].unique()) - {'SYNTHETIC', 'UNKNOWN'}))
+    non_subjects = sorted(list(set(df[df['label'] == 'nondemented']['subject_id'].unique()) - {'SYNTHETIC', 'UNKNOWN'}))
+    
     random.seed(seed)
-    random.shuffle(real_subjects)
+    random.shuffle(mod_subjects)
+    random.shuffle(non_subjects)
     
-    n_total = len(real_subjects)
-    n_train = int(0.70 * n_total)
-    n_val = int(0.15 * n_total)
+    # Stratified subject allocation:
+    train_subs = set()
+    val_subs = set()
+    test_subs = set()
     
-    train_subs = set(real_subjects[:n_train])
-    val_subs = set(real_subjects[n_train:n_train+n_val])
-    test_subs = set(real_subjects[n_train+n_val:])
+    # 1 moderate dementia patient in each split
+    if len(mod_subjects) >= 3:
+        train_subs.add(mod_subjects[0])
+        val_subs.add(mod_subjects[1])
+        test_subs.add(mod_subjects[2])
+    else:
+        for i, s in enumerate(mod_subjects):
+            if i == 0: train_subs.add(s)
+            elif i == 1: val_subs.add(s)
+            else: test_subs.add(s)
+            
+    n_non = len(non_subjects)
+    n_train_non = int(0.70 * n_non)
+    n_val_non = int(0.15 * n_non)
     
-    print(f"Track B Subjects: total={n_total} (train={len(train_subs)}, val={len(val_subs)}, test={len(test_subs)})")
+    train_subs.update(non_subjects[:n_train_non])
+    val_subs.update(non_subjects[n_train_non:n_train_non+n_val_non])
+    test_subs.update(non_subjects[n_train_non+n_val_non:])
+    
+    print(f"Track B Subjects: total={len(train_subs)+len(val_subs)+len(test_subs)} (train={len(train_subs)}, val={len(val_subs)}, test={len(test_subs)})")
+    print(f"Moderate Dementia subject assignment: train={mod_subjects[0]}, val={mod_subjects[1]}, test={mod_subjects[2]}")
     
     # Verify zero overlap
     assert len(train_subs & val_subs) == 0

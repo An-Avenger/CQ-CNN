@@ -312,7 +312,7 @@ def aggregate_seeds(results):
 
 def parse_args():
     p = argparse.ArgumentParser()
-    p.add_argument("--data_root", default="datasets/OASIS-2/preprocessed_balanced")
+    p.add_argument("--data_root", default=".")
     p.add_argument("--manifest",  default="data_manifest.csv")
     p.add_argument("--view",      default="axial", choices=["axial", "coronal", "sagittal", "3-plane"])
     p.add_argument("--qubits",    type=int, default=3, choices=[2, 3])
