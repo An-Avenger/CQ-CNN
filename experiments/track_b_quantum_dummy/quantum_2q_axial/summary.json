@@ -1,0 +1,17 @@
+{
+  "model": "quantum_2q_axial",
+  "accuracy_mean": 55.0,
+  "accuracy_std": 0.0,
+  "balanced_accuracy_mean": 50.0,
+  "balanced_accuracy_std": 0.0,
+  "precision_mean": 0.0,
+  "precision_std": 0.0,
+  "recall_mean": 0.0,
+  "recall_std": 0.0,
+  "specificity_mean": 100.0,
+  "specificity_std": 0.0,
+  "f1_mean": 0.0,
+  "f1_std": 0.0,
+  "roc_auc_mean": 0.4646,
+  "roc_auc_std": 0.0
+}
