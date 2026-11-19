@@ -55,11 +55,11 @@ from qiskit.primitives import StatevectorEstimator as Estimator
 # ─── Config ─────────────────────────────────────────────────────────────────
 
 IMAGE_SIZE   = 128
-EPOCHS       = 15
-BATCH_SIZE   = 8
+EPOCHS       = 10
+BATCH_SIZE   = 16
 LR           = 0.001
 N_SEEDS      = 3        # Number of repeated seeds for confidence intervals
-PATIENCE     = 4        # LR reduce patience
+PATIENCE     = 3        # LR reduce patience
 LR_FACTOR    = 0.7
 MIN_LR       = 1e-6
 LABEL_MAP    = {"nondemented": 0, "moderate_dementia": 1}
@@ -237,12 +237,15 @@ def compute_full_metrics(model, loader):
 # ─── Main Training Loop ─────────────────────────────────────────────────────
 
 def run_experiment(model, model_name, train_loader, val_loader, test_loader,
-                   seed, out_dir, is_quantum=True):
+                   seed, out_dir, is_quantum=True, class_weights=None):
     set_seed(seed)
     os.makedirs(out_dir, exist_ok=True)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=LR)
-    loss_fn   = nn.CrossEntropyLoss()
+    if class_weights is not None:
+        loss_fn = nn.CrossEntropyLoss(weight=class_weights)
+    else:
+        loss_fn = nn.CrossEntropyLoss()
 
     best_val_loss = float("inf")
     wait = 0
@@ -320,6 +323,7 @@ def parse_args():
     p.add_argument("--mode",      default="full", choices=["full", "dummy"])
     p.add_argument("--out_dir",   default="experiments/track_b")
     p.add_argument("--seeds",     type=int, default=N_SEEDS)
+    p.add_argument("--weighted",  action="store_true", help="Apply class-frequency inverse weighting to loss")
     return p.parse_args()
 
 def main():
@@ -365,6 +369,17 @@ def main():
             lbls = [l for _, l in ds.data]
         print(f"  {name}: total={len(lbls)}, class0={lbls.count(0)}, class1={lbls.count(1)}")
 
+    class_weights = None
+    if args.weighted:
+        tr_lbls = [l for _, l in (train_ds.records if hasattr(train_ds, 'records') else train_ds.data)]
+        c0 = tr_lbls.count(0)
+        c1 = tr_lbls.count(1)
+        tot = len(tr_lbls)
+        w0 = tot / (2.0 * max(c0, 1))
+        w1 = tot / (2.0 * max(c1, 1))
+        class_weights = torch.tensor([w0, w1], dtype=torch.float32)
+        print(f"\n[INFO] Applied Inverse Class Weights: non-dem={w0:.4f}, mod-dem={w1:.4f}")
+
     # ── Run across seeds ───────────────────────────────────────────────────
     all_results = []
     model_name = f"{args.arch}_{args.qubits}q_{args.view}" if args.arch == "quantum" else f"classical_{args.view}"
@@ -386,7 +401,8 @@ def main():
 
         metrics = run_experiment(
             model, model_name, train_loader, val_loader, test_loader,
-            seed=seed, out_dir=out_dir, is_quantum=(args.arch == "quantum")
+            seed=seed, out_dir=out_dir, is_quantum=(args.arch == "quantum"),
+            class_weights=class_weights
         )
         all_results.append(metrics)
 

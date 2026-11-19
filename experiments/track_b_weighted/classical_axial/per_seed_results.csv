@@ -1,0 +1,2 @@
+accuracy,balanced_accuracy,precision,recall,specificity,f1,roc_auc,confusion_matrix,n_samples,wall_time_secs,model,seed
+96.9925,50.0,0.0,0.0,100.0,0.0,0.7114,"[[8514, 0], [264, 0]]",8778,5272.0,classical_axial,0
