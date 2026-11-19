@@ -35,18 +35,25 @@ def generate_evaluation_report():
     # 2. Load Track B Results
     track_b_standard = os.path.join(EXP_DIR, "track_b", "classical_axial", "summary.json")
     track_b_weighted = os.path.join(EXP_DIR, "track_b_weighted", "classical_axial", "summary.json")
+    track_b_quantum  = os.path.join(EXP_DIR, "track_b_quantum_real", "quantum_2q_axial", "summary.json")
 
     results_b = []
     if os.path.exists(track_b_standard):
         with open(track_b_standard, "r") as f:
             data = json.load(f)
-            data["setting"] = "Standard Cross-Entropy"
+            data["setting"] = "Classical (Std Cross-Entropy)"
             results_b.append(data)
             
     if os.path.exists(track_b_weighted):
         with open(track_b_weighted, "r") as f:
             data = json.load(f)
-            data["setting"] = "Inverse Class-Weighted"
+            data["setting"] = "Classical (Inverse Class-Weighted)"
+            results_b.append(data)
+
+    if os.path.exists(track_b_quantum):
+        with open(track_b_quantum, "r") as f:
+            data = json.load(f)
+            data["setting"] = "2-Qubit CQ-CNN (Class-Weighted)"
             results_b.append(data)
 
     df_b = pd.DataFrame(results_b)
