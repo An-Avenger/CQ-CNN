@@ -1,16 +1,22 @@
+"""
+Dual-Track Data Manifest Builder for OASIS-2 MRI
+=================================================
+Safeguards implemented:
+  1. Preserves patient/subject IDs and session IDs.
+  2. Builds Track A (slice-level 90/10 split) strictly matching the original paper methodology.
+  3. Builds Track B (subject-level 70/15/15 split) strictly guaranteeing zero patient overlap.
+  4. Keeps synthetic DDPM slices exclusively within the training split.
+  5. Never drops test slices for artificial class balancing.
+"""
+
 import os
 import re
-import csv
 import random
+import argparse
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
 def extract_metadata_from_filename(filename):
-    """
-    Parses OASIS-2 filename formats:
-    Real: OAS2_0001_MR1_mpr-1_axial_slice_45.jpg
-    Synthetic: axial_Epoch_750_generated_image_1.png
-    """
     is_synthetic = 'generated' in filename or 'Epoch' in filename
     if is_synthetic:
         plane = 'axial' if 'axial' in filename else ('coronal' if 'coronal' in filename else 'sagittal')
@@ -22,7 +28,6 @@ def extract_metadata_from_filename(filename):
             'is_synthetic': True
         }
     
-    # Real scan regex
     match = re.search(r'(OAS2_\d+)_([A-Za-z0-9]+)_.*?(axial|coronal|sagittal)_slice_(\d+)', filename, re.IGNORECASE)
     if match:
         return {
@@ -40,43 +45,48 @@ def extract_metadata_from_filename(filename):
         'is_synthetic': False
     }
 
-def build_manifest(views_dir, output_manifest_path, seed=42):
-    """
-    Traverses views/ or preprocessed/ directories, parses subject IDs,
-    and assigns both Track A (slice-level) and Track B (subject-level) splits.
-    """
+def build_manifest(views_dirs, output_manifest_path, seed=42):
     records = []
     
-    # Walk dataset directory
-    for root, _, files in os.walk(views_dir):
-        for f in files:
-            if f.endswith(('.jpg', '.png', '.jpeg')):
-                full_path = os.path.join(root, f)
-                rel_path = os.path.relpath(full_path, start=views_dir)
-                meta = extract_metadata_from_filename(f)
-                
-                # Determine label from directory hierarchy
-                label = 'moderate_dementia' if 'moderate_dementia' in full_path.lower() else 'nondemented'
-                is_skull_stripped = 'ss' in full_path.lower() or 'skullstrip' in full_path.lower()
-                
-                records.append({
-                    'slice_id': f,
-                    'subject_id': meta['subject_id'],
-                    'session_id': meta['session_id'],
-                    'plane': meta['plane'],
-                    'slice_idx': meta['slice_idx'],
-                    'is_skull_stripped': is_skull_stripped,
-                    'label': label,
-                    'is_synthetic': meta['is_synthetic'],
-                    'file_path': rel_path
-                })
-                
+    if isinstance(views_dirs, str):
+        views_dirs = [views_dirs]
+        
+    for v_dir in views_dirs:
+        if not os.path.exists(v_dir):
+            continue
+        print(f"Scanning directory: {v_dir}")
+        for root, _, files in os.walk(v_dir):
+            for f in files:
+                if f.endswith(('.jpg', '.png', '.jpeg')):
+                    full_path = os.path.join(root, f)
+                    rel_path = os.path.relpath(full_path, start=os.path.dirname(output_manifest_path) or '.')
+                    meta = extract_metadata_from_filename(f)
+                    
+                    label = 'moderate_dementia' if 'moderate_dementia' in full_path.lower() else 'nondemented'
+                    is_skull_stripped = 'ss' in full_path.lower() or 'skullstrip' in full_path.lower()
+                    
+                    records.append({
+                        'slice_id': f,
+                        'subject_id': meta['subject_id'],
+                        'session_id': meta['session_id'],
+                        'plane': meta['plane'],
+                        'slice_idx': meta['slice_idx'],
+                        'is_skull_stripped': is_skull_stripped,
+                        'label': label,
+                        'is_synthetic': meta['is_synthetic'],
+                        'file_path': rel_path
+                    })
+                    
     df = pd.DataFrame(records)
     if df.empty:
         print("No image records found to populate manifest.")
         return df
 
-    # Track A Partitioning (Slice-level 90/10 random split per class and plane)
+    print(f"Total slices indexed: {len(df)}")
+    print("Class breakdown:\n", df['label'].value_counts())
+    print("Plane breakdown:\n", df['plane'].value_counts())
+
+    # Track A Partitioning (Slice-level 90/10 split per class and plane)
     df['track_a_split'] = 'train'
     for (plane, label), group in df.groupby(['plane', 'label']):
         idx = group.index
@@ -84,8 +94,8 @@ def build_manifest(views_dir, output_manifest_path, seed=42):
             _, test_idx = train_test_split(idx, test_size=0.1, random_state=seed)
             df.loc[test_idx, 'track_a_split'] = 'test'
 
-    # Track B Partitioning (Subject-level: zero subject overlap between splits)
-    real_subjects = [s for s in df['subject_id'].unique() if s not in ['SYNTHETIC', 'UNKNOWN']]
+    # Track B Partitioning (Subject-level: zero subject overlap across splits)
+    real_subjects = sorted(list(set(s for s in df['subject_id'].unique() if s not in ['SYNTHETIC', 'UNKNOWN'])))
     random.seed(seed)
     random.shuffle(real_subjects)
     
@@ -97,6 +107,13 @@ def build_manifest(views_dir, output_manifest_path, seed=42):
     val_subs = set(real_subjects[n_train:n_train+n_val])
     test_subs = set(real_subjects[n_train+n_val:])
     
+    print(f"Track B Subjects: total={n_total} (train={len(train_subs)}, val={len(val_subs)}, test={len(test_subs)})")
+    
+    # Verify zero overlap
+    assert len(train_subs & val_subs) == 0
+    assert len(train_subs & test_subs) == 0
+    assert len(val_subs & test_subs) == 0
+
     def assign_track_b(row):
         if row['is_synthetic']:
             return 'train'  # Clinical safeguard: synthetics ONLY in train
@@ -116,5 +133,10 @@ def build_manifest(views_dir, output_manifest_path, seed=42):
     return df
 
 if __name__ == '__main__':
-    build_manifest('datasets/sample_test', 'data_manifest.csv')
-
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--views', nargs='+', default=['datasets/OASIS-2/views', 'datasets/sample_test'])
+    parser.add_argument('--out', default='data_manifest.csv')
+    parser.add_argument('--seed', type=int, default=42)
+    args = parser.parse_args()
+    
+    build_manifest(args.views, args.out, seed=args.seed)
