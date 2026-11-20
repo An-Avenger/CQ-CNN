@@ -1,0 +1,6 @@
+noise_level,p1_error,p2_cnot_error,readout_error,mean_absolute_deviation,signal_correlation
+Ideal Statevector (0% Noise),0.0,0.0,0.0,0.0,1.0
+"Low NISQ Noise (0.1% 1Q, 1% 2Q)",0.001,0.01,0.01,0.0394,0.9991
+"Medium NISQ Noise (0.5% 1Q, 3% 2Q)",0.005,0.03,0.03,0.1146,0.9987
+"High NISQ Noise (1.0% 1Q, 5% 2Q)",0.01,0.05,0.05,0.1784,0.9975
+"Severe NISQ Noise (2.0% 1Q, 10% 2Q)",0.02,0.1,0.1,0.2949,0.9991

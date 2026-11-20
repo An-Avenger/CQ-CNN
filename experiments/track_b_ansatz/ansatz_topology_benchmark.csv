@@ -1,0 +1,5 @@
+ansatz_name,ansatz_type,entanglement,circuit_depth,quantum_parameters,total_model_parameters,simulation_throughput_img_sec,step_loss
+RealAmplitudes (Linear) - Paper Baseline,real_amplitudes,linear,2,4,13732,16.01,1.9765
+RealAmplitudes (Circular Entanglement),real_amplitudes,circular,2,4,13732,21.72,1.9764
+EfficientSU2 (Strongly Entangling Full),efficient_su2,full,2,8,13736,11.51,0.926
+Hardware-Efficient Ansatz (HEA),hea,linear,2,8,13736,13.36,1.5917

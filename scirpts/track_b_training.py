@@ -178,6 +178,28 @@ class DummyDataset(Dataset):
 
 # ─── Training utilities ─────────────────────────────────────────────────────
 
+class FocalLoss(nn.Module):
+    """
+    Focal Loss for addressing extreme class imbalance in medical imaging.
+    FL(p_t) = -alpha_t * (1 - p_t)^gamma * log(p_t)
+    Down-weights easy background/non-demented slices and focuses gradient
+    updates on hard-to-classify borderline/atrophy cases.
+    """
+    def __init__(self, alpha=0.75, gamma=2.0, reduction="mean"):
+        super().__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+        self.reduction = reduction
+
+    def forward(self, inputs, targets):
+        probs = F.softmax(inputs, dim=1)
+        ce_loss = F.cross_entropy(inputs, targets, reduction="none")
+        p_t = probs.gather(1, targets.view(-1, 1)).squeeze(1)
+        alpha_t = torch.where(targets == 1, self.alpha, 1.0 - self.alpha)
+        focal_weight = alpha_t * ((1.0 - p_t) ** self.gamma)
+        loss = focal_weight * ce_loss
+        return loss.mean() if self.reduction == "mean" else loss.sum()
+
 def set_seed(seed):
     random.seed(seed); np.random.seed(seed); torch.manual_seed(seed)
 
@@ -237,12 +259,15 @@ def compute_full_metrics(model, loader):
 # ─── Main Training Loop ─────────────────────────────────────────────────────
 
 def run_experiment(model, model_name, train_loader, val_loader, test_loader,
-                   seed, out_dir, is_quantum=True, class_weights=None):
+                   seed, out_dir, is_quantum=True, class_weights=None, loss_type="ce",
+                   focal_gamma=2.0, focal_alpha=0.75):
     set_seed(seed)
     os.makedirs(out_dir, exist_ok=True)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=LR)
-    if class_weights is not None:
+    if loss_type == "focal":
+        loss_fn = FocalLoss(alpha=focal_alpha, gamma=focal_gamma)
+    elif class_weights is not None or loss_type == "weighted":
         loss_fn = nn.CrossEntropyLoss(weight=class_weights)
     else:
         loss_fn = nn.CrossEntropyLoss()
@@ -324,6 +349,9 @@ def parse_args():
     p.add_argument("--out_dir",   default="experiments/track_b")
     p.add_argument("--seeds",     type=int, default=N_SEEDS)
     p.add_argument("--weighted",  action="store_true", help="Apply class-frequency inverse weighting to loss")
+    p.add_argument("--loss",      default="ce", choices=["ce", "weighted", "focal"], help="Loss formulation: standard CE, class-weighted CE, or Focal Loss")
+    p.add_argument("--focal_gamma", type=float, default=2.0, help="Focusing parameter gamma for Focal Loss")
+    p.add_argument("--focal_alpha", type=float, default=0.75, help="Alpha balancing factor for minority class in Focal Loss")
     return p.parse_args()
 
 def main():
@@ -370,7 +398,7 @@ def main():
         print(f"  {name}: total={len(lbls)}, class0={lbls.count(0)}, class1={lbls.count(1)}")
 
     class_weights = None
-    if args.weighted:
+    if args.weighted or args.loss == "weighted":
         tr_lbls = [l for _, l in (train_ds.records if hasattr(train_ds, 'records') else train_ds.data)]
         c0 = tr_lbls.count(0)
         c1 = tr_lbls.count(1)
@@ -379,6 +407,9 @@ def main():
         w1 = tot / (2.0 * max(c1, 1))
         class_weights = torch.tensor([w0, w1], dtype=torch.float32)
         print(f"\n[INFO] Applied Inverse Class Weights: non-dem={w0:.4f}, mod-dem={w1:.4f}")
+
+    if args.loss == "focal":
+        print(f"\n[INFO] Applied Focal Loss (gamma={args.focal_gamma}, alpha={args.focal_alpha})")
 
     # ── Run across seeds ───────────────────────────────────────────────────
     all_results = []
@@ -402,7 +433,8 @@ def main():
         metrics = run_experiment(
             model, model_name, train_loader, val_loader, test_loader,
             seed=seed, out_dir=out_dir, is_quantum=(args.arch == "quantum"),
-            class_weights=class_weights
+            class_weights=class_weights, loss_type=args.loss,
+            focal_gamma=args.focal_gamma, focal_alpha=args.focal_alpha
         )
         all_results.append(metrics)
 
