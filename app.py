@@ -19,11 +19,13 @@ from PIL import Image
 import streamlit as st
 from torchvision import transforms
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
-from scirpts.track_b_training import ClassicalNet, QuantumNet, create_qnn
+# ClassicalNet imported at top-level (no heavy deps)
+# QuantumNet / create_qnn are lazy-loaded inside load_quantum_model()
+from scirpts.track_b_training import ClassicalNet
 
 st.set_page_config(
     page_title="CQ-CNN Neuroimaging Clinical Dashboard",
@@ -85,6 +87,11 @@ def load_classical_model():
 
 @st.cache_resource
 def load_quantum_model():
+    try:
+        from scirpts.track_b_training import QuantumNet, create_qnn
+    except Exception as e:
+        st.error(f"Quantum backend unavailable: {e}")
+        return None
     qnn = create_qnn(2)
     model = QuantumNet(qnn, 2, conv2_ch=4)
     ckpt = os.path.join(BASE_DIR, "experiments", "track_b_quantum_real", "quantum_2q_axial", "quantum_2q_axial_seed0_best.pt")
@@ -151,6 +158,9 @@ with col2:
                     prob_mod = float(F.softmax(out, dim=1)[0, 1].numpy())
             else:
                 model = load_quantum_model()
+                if model is None:
+                    st.error("Quantum model could not be loaded. Try the Classical model.")
+                    st.stop()
                 with torch.no_grad():
                     out = model(tensor)
                     prob_mod = float(F.softmax(out, dim=1)[0, 1].numpy())
